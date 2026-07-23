@@ -10,10 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { toast } from "sonner";
-import { Receipt, Plus, Eye, Trash2 } from "lucide-react";
+import { Receipt, Plus, Eye, Trash2, Download } from "lucide-react";
 import { formatCurrency, formatDate, generateNumber } from "@/lib/brand.ts";
 import { LineItemsEditor, calcTotals, type LineItem } from "@/pages/documents/_components/LineItemsEditor.tsx";
 import DocumentPreview from "@/pages/documents/_components/DocumentPreview.tsx";
+import { generateDocumentPDF } from "@/lib/pdf.ts";
 import type { Id } from "@/convex/_generated/dataModel.js";
 
 export default function ReceiptsPage() {
@@ -75,6 +76,29 @@ export default function ReceiptsPage() {
     toast.success("Deleted");
   }
 
+  async function handleDownload(r: NonNullable<typeof receipts>[0]) {
+    try {
+      await generateDocumentPDF({
+        type: "receipt",
+        number: r.receiptNumber,
+        issueDate: r.issueDate,
+        status: "paid",
+        client: r.client,
+        userProfile: profile,
+        items: r.items,
+        subtotal: r.subtotal,
+        taxAmount: r.taxAmount,
+        discountAmount: r.discountAmount,
+        total: r.total,
+        currency: r.currency,
+        notes: r.notes,
+        paymentMethod: r.paymentMethod,
+      });
+    } catch {
+      toast.error("Failed to generate PDF");
+    }
+  }
+
   return (
     <div className="p-6 pb-24 md:pb-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -110,6 +134,7 @@ export default function ReceiptsPage() {
                 </div>
                 <div className="flex items-center gap-3 flex-shrink-0">
                   <p className="font-bold text-foreground">{formatCurrency(r.total, r.currency)}</p>
+                  <Button size="icon" variant="ghost" onClick={() => handleDownload(r)} title="Download PDF"><Download className="h-4 w-4" /></Button>
                   <Button size="icon" variant="ghost" onClick={() => setPreviewId(r._id)}><Eye className="h-4 w-4" /></Button>
                   <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDelete(r._id)}><Trash2 className="h-4 w-4" /></Button>
                 </div>

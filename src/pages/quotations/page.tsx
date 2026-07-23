@@ -9,12 +9,14 @@ import { Skeleton } from "@/components/ui/skeleton.tsx";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog.tsx";
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
+import { Badge } from "@/components/ui/badge.tsx";
 import { toast } from "sonner";
-import { ClipboardList, Plus, Eye, Pencil, Trash2 } from "lucide-react";
+import { ClipboardList, Plus, Eye, Pencil, Trash2, Download } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import { formatCurrency, formatDate, generateNumber } from "@/lib/brand.ts";
 import { LineItemsEditor, TotalsEditor, calcTotals, type LineItem } from "@/pages/documents/_components/LineItemsEditor.tsx";
 import DocumentPreview from "@/pages/documents/_components/DocumentPreview.tsx";
+import { generateDocumentPDF } from "@/lib/pdf.ts";
 import type { Id } from "@/convex/_generated/dataModel.js";
 
 const statusColors: Record<string, string> = {
@@ -128,6 +130,32 @@ export default function QuotationsPage() {
     toast.success("Deleted");
   }
 
+  async function handleDownload(q: NonNullable<typeof quotations>[0]) {
+    try {
+      await generateDocumentPDF({
+        type: "quotation",
+        number: q.quoteNumber,
+        issueDate: q.issueDate,
+        expiryDate: q.expiryDate,
+        status: q.status,
+        client: q.client,
+        userProfile: profile,
+        items: q.items,
+        subtotal: q.subtotal,
+        taxRate: q.taxRate,
+        taxAmount: q.taxAmount,
+        discountRate: q.discountRate,
+        discountAmount: q.discountAmount,
+        total: q.total,
+        currency: q.currency,
+        notes: q.notes,
+        terms: q.terms,
+      });
+    } catch {
+      toast.error("Failed to generate PDF");
+    }
+  }
+
   return (
     <div className="p-6 pb-24 md:pb-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -171,6 +199,7 @@ export default function QuotationsPage() {
                       {["draft","sent","accepted","declined","expired"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  <Button size="icon" variant="ghost" onClick={() => handleDownload(q)} title="Download PDF"><Download className="h-4 w-4" /></Button>
                   <Button size="icon" variant="ghost" onClick={() => setPreviewId(q._id)}><Eye className="h-4 w-4" /></Button>
                   <Button size="icon" variant="ghost" onClick={() => openEdit(q)}><Pencil className="h-4 w-4" /></Button>
                   <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDelete(q._id)}><Trash2 className="h-4 w-4" /></Button>

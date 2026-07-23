@@ -10,11 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Empty, EmptyHeader, EmptyMedia, EmptyTitle, EmptyDescription, EmptyContent } from "@/components/ui/empty.tsx";
 import { Card, CardContent } from "@/components/ui/card.tsx";
 import { toast } from "sonner";
-import { FileText, Plus, Eye, Pencil, Trash2 } from "lucide-react";
+import { FileText, Plus, Eye, Pencil, Trash2, Download } from "lucide-react";
 import { cn } from "@/lib/utils.ts";
 import { formatCurrency, formatDate, generateNumber } from "@/lib/brand.ts";
 import { LineItemsEditor, TotalsEditor, calcTotals, type LineItem } from "@/pages/documents/_components/LineItemsEditor.tsx";
 import DocumentPreview from "@/pages/documents/_components/DocumentPreview.tsx";
+import { generateDocumentPDF } from "@/lib/pdf.ts";
 import type { Id } from "@/convex/_generated/dataModel.js";
 
 const statusColors: Record<string, string> = {
@@ -131,6 +132,32 @@ export default function InvoicesPage() {
     toast.success("Deleted");
   }
 
+  async function handleDownload(inv: NonNullable<typeof invoices>[0]) {
+    try {
+      await generateDocumentPDF({
+        type: "invoice",
+        number: inv.invoiceNumber,
+        issueDate: inv.issueDate,
+        dueDate: inv.dueDate,
+        status: inv.status,
+        client: inv.client,
+        userProfile: profile,
+        items: inv.items,
+        subtotal: inv.subtotal,
+        taxRate: inv.taxRate,
+        taxAmount: inv.taxAmount,
+        discountRate: inv.discountRate,
+        discountAmount: inv.discountAmount,
+        total: inv.total,
+        currency: inv.currency,
+        notes: inv.notes,
+        terms: inv.terms,
+      });
+    } catch {
+      toast.error("Failed to generate PDF");
+    }
+  }
+
   return (
     <div className="p-6 pb-24 md:pb-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
@@ -174,6 +201,7 @@ export default function InvoicesPage() {
                       {["draft","sent","paid","overdue","cancelled"].map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  <Button size="icon" variant="ghost" onClick={() => handleDownload(inv)} title="Download PDF"><Download className="h-4 w-4" /></Button>
                   <Button size="icon" variant="ghost" onClick={() => setPreviewId(inv._id)}><Eye className="h-4 w-4" /></Button>
                   <Button size="icon" variant="ghost" onClick={() => openEdit(inv)}><Pencil className="h-4 w-4" /></Button>
                   <Button size="icon" variant="ghost" className="text-destructive" onClick={() => handleDelete(inv._id)}><Trash2 className="h-4 w-4" /></Button>
