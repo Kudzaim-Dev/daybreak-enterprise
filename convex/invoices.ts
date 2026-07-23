@@ -1,0 +1,20 @@
+import { mutation, query } from "./_generated/server";
+import { v, ConvexError } from "convex/values";
+import type { QueryCtx } from "./_generated/server";
+
+async function getAuthUser(ctx: QueryCtx) {
+  const identity = await ctx.auth.getUserIdentity();
+  if (!identity) throw new ConvexError({ message: "Not authenticated", code: "UNAUTHENTICATED" });
+  const user = await ctx.db.query("users").withIndex("by_token", (q) => q.eq("tokenIdentifier", identity.tokenIdentifier)).unique();
+  if (!user) throw new ConvexError({ message: "User not found", code: "NOT_FOUND" });
+  return user;
+}
+
+const itemValidator = v.object({ productId: v.optional(v.id("products")), description: v.string(), quantity: v.number(), unitPrice: v.number(), total: v.number() });
+
+export const list = query({ args: {}, handler: async (ctx) => { const user = await getAuthUser(ctx); const invoices = await ctx.db.query("invoices").withIndex("by_user", (q) => q.eq("userId", user._id)).order("desc").collect(); return await Promise.all(invoices.map(async (inv) => ({ ...inv, client: await ctx.db.get(inv.clientId) }))); } });
+export const get = query({ args: { id: v.id("invoices") }, handler: async (ctx, args) => { const user = await getAuthUser(ctx); const invoice = await ctx.db.get(args.id); if (!invoice || invoice.userId !== user._id) return null; return { ...invoice, client: await ctx.db.get(invoice.clientId) }; } });
+export const create = mutation({ args: { clientId: v.id("clients"), quotationId: v.optional(v.id("quotations")), invoiceNumber: v.string(), status: v.union(v.literal("draft"), v.literal("sent"), v.literal("paid"), v.literal("overdue"), v.literal("cancelled")), issueDate: v.string(), dueDate: v.optional(v.string()), currency: v.string(), items: v.array(itemValidator), subtotal: v.number(), taxRate: v.optional(v.number()), taxAmount: v.optional(v.number()), discountRate: v.optional(v.number()), discountAmount: v.optional(v.number()), total: v.number(), paidAmount: v.optional(v.number()), paidDate: v.optional(v.string()), notes: v.optional(v.string()), terms: v.optional(v.string()) }, handler: async (ctx, args) => { const user = await getAuthUser(ctx); return await ctx.db.insert("invoices", { ...args, userId: user._id }); } });
+export const update = mutation({ args: { id: v.id("invoices"), clientId: v.id("clients"), status: v.union(v.literal("draft"), v.literal("sent"), v.literal("paid"), v.literal("overdue"), v.literal("cancelled")), issueDate: v.string(), dueDate: v.optional(v.string()), currency: v.string(), items: v.array(itemValidator), subtotal: v.number(), taxRate: v.optional(v.number()), taxAmount: v.optional(v.number()), discountRate: v.optional(v.number()), discountAmount: v.optional(v.number()), total: v.number(), paidAmount: v.optional(v.number()), paidDate: v.optional(v.string()), notes: v.optional(v.string()), terms: v.optional(v.string()) }, handler: async (ctx, args) => { const user = await getAuthUser(ctx); const doc = await ctx.db.get(args.id); if (!doc || doc.userId !== user._id) throw new ConvexError({ message: "Not found", code: "NOT_FOUND" }); const { id, ...data } = args; await ctx.db.patch(id, data); } });
+export const updateStatus = mutation({ args: { id: v.id("invoices"), status: v.union(v.literal("draft"), v.literal("sent"), v.literal("paid"), v.literal("overdue"), v.literal("cancelled")), paidDate: v.optional(v.string()), paidAmount: v.optional(v.number()) }, handler: async (ctx, args) => { const user = await getAuthUser(ctx); const doc = await ctx.db.get(args.id); if (!doc || doc.userId !== user._id) throw new ConvexError({ message: "Not found", code: "NOT_FOUND" }); await ctx.db.patch(args.id, { status: args.status, paidDate: args.paidDate, paidAmount: args.paidAmount }); } });
+export const remove = mutation({ args: { id: v.id("invoices") }, handler: async (ctx, args) => { const user = await getAuthUser(ctx); const doc = await ctx.db.get(args.id); if (!doc || doc.userId !== user._id) throw new ConvexError({ message: "Not found", code: "NOT_FOUND" }); await ctx.db.delete(args.id); } });
